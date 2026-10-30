@@ -1,0 +1,202 @@
+<!-- 惠州市考试工作日程系统 -->
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>惠州市考试工作日程系统</title>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div id="loginView" class="login-wrap">
+  <div class="login-card">
+    <div class="login-brand">
+      <div class="login-logo">📅</div>
+      <h1>惠州市考试工作日程系统</h1>
+      <p>考试全流程工作安排 · 多人协作 · 手机日历同步</p>
+    </div>
+
+    <div class="tab-line">
+      <button class="tab-btn active" data-auth-tab="login">登 录</button>
+      <button class="tab-btn" data-auth-tab="register">注 册</button>
+    </div>
+
+    <div id="loginPanel">
+      <label class="field"><span>邮箱</span>
+        <input id="loginEmail" type="email" autocomplete="username" placeholder="请输入邮箱">
+      </label>
+      <label class="field"><span>密码</span>
+        <input id="loginPassword" type="password" autocomplete="current-password" placeholder="请输入密码">
+      </label>
+      <button id="btnLogin" class="btn btn-primary btn-block">登 录</button>
+    </div>
+
+    <div id="registerPanel" hidden>
+      <label class="field"><span>姓名</span>
+        <input id="regName" type="text" placeholder="如：张伟">
+      </label>
+      <label class="field"><span>科室 / 单位</span>
+        <input id="regDept" type="text" placeholder="如：考务科">
+      </label>
+      <label class="field"><span>邮箱</span>
+        <input id="regEmail" type="email" placeholder="用于登录的邮箱">
+      </label>
+      <label class="field"><span>密码</span>
+        <input id="regPassword" type="password" placeholder="至少 6 位">
+      </label>
+      <label class="field"><span>邀请码</span>
+        <input id="regInvite" type="text" placeholder="请向管理员索取">
+      </label>
+      <button id="btnRegister" class="btn btn-primary btn-block">注 册</button>
+    </div>
+
+    <div id="authMsg" class="auth-msg" hidden></div>
+    <div id="demoHint" class="demo-hint" hidden></div>
+  </div>
+</div>
+
+<div id="appView" hidden>
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="brand-dot">📅</span>
+      <span class="brand-name">惠州市考试工作日程系统</span>
+      <span id="modeBadge" class="badge badge-local" hidden>本地演示模式</span>
+    </div>
+    <nav class="topbar-nav">
+      <button class="nav-btn active" data-view="home">我的日程</button>
+      <button class="nav-btn" data-view="todo">待办日程 <span id="todoBadge" class="nav-count" hidden>0</span></button>
+      <button class="nav-btn" data-view="templates">模板库</button>
+      <button class="nav-btn" data-view="admin" id="navAdmin" hidden>管理中心</button>
+      <button class="nav-btn" data-view="settings">设置</button>
+    </nav>
+    <div class="topbar-right">
+      <span id="userChip" class="user-chip"></span>
+      <button id="btnLogout" class="btn btn-sm">退出</button>
+    </div>
+  </header>
+
+  <main class="page">
+    <section id="viewHome" class="view">
+      <div id="remindBar" class="remind-bar" hidden></div>
+      <div class="view-head">
+        <div>
+          <h2>我的日程</h2>
+          <p class="sub">我创建的和别人共享给我的考试工作安排</p>
+        </div>
+        <button id="btnNew" class="btn btn-primary">+ 新建日程</button>
+      </div>
+      <div id="homeList" class="card-list"></div>
+    </section>
+
+    <section id="viewTodo" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <h2>待办日程</h2>
+          <p class="sub">与我相关的所有工作事项，按时间排序</p>
+        </div>
+        <div class="seg" id="todoFilter">
+          <button class="seg-btn active" data-todo="open">未完成</button>
+          <button class="seg-btn" data-todo="done">已完成</button>
+          <button class="seg-btn" data-todo="all">全部</button>
+        </div>
+      </div>
+      <div id="todoList"></div>
+    </section>
+
+    <section id="viewTemplates" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <h2>模板库</h2>
+          <p class="sub">内置考试流程模板，以及管理员发布的标准清单</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span>中心发布的标准模板</span>
+          <button class="btn btn-sm btn-primary" id="btnPublishTemplate" hidden>+ 发布模板</button>
+        </div>
+        <div id="libList" class="tpl-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>内置考试流程模板</span></div>
+        <div id="builtinList" class="tpl-list"></div>
+      </div>
+    </section>
+
+    <section id="viewAdmin" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <h2>管理中心</h2>
+          <p class="sub">查看全部日程、管理账号、审计操作记录、备份数据</p>
+        </div>
+        <button class="btn" id="btnBackup">⬇ 导出全部数据</button>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span>全部日程（所有用户）</span>
+          <input id="adminSearch" class="search-input" placeholder="搜索日程名称 / 创建人">
+        </div>
+        <div id="adminSchedules" class="card-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>用户管理</span><span class="hint">停用后该账号无法登录</span></div>
+        <div id="adminUsers" class="user-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>操作日志</span><span class="hint">最近 300 条</span></div>
+        <div id="adminLogs" class="log-list"></div>
+      </div>
+    </section>
+
+    <section id="viewSettings" class="view" hidden>
+      <div class="view-head">
+        <div>
+          <h2>设置</h2>
+          <p class="sub">个人信息与使用说明</p>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>我的资料</span></div>
+        <div class="panel-body">
+          <div class="grid2">
+            <label class="field"><span>姓名</span><input id="pfName" type="text"></label>
+            <label class="field"><span>科室 / 单位</span><input id="pfDept" type="text"></label>
+            <label class="field"><span>手机号</span><input id="pfPhone" type="text"></label>
+            <label class="field"><span>邮箱</span><input id="pfEmail" type="text" disabled></label>
+          </div>
+          <button class="btn btn-primary" id="btnSaveProfile">保存资料</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head"><span>使用说明</span></div>
+        <div class="panel-body tips">
+          <p><strong>1. 新建日程：</strong>选择考试类型和考试日期，系统按内置流程自动生成全部工作节点，可增删改后保存。</p>
+          <p><strong>2. 协同同事：</strong>新建时勾选同事，他们会在"待办日程"看到这张表；只有创建者能修改日程内容，同事可以打勾和写备注。</p>
+          <p><strong>3. 手机日历：</strong>打开日程详情点"导入手机日历"，下载 .ics 文件后：iPhone 用「文件」打开 → 自动加入日历；安卓用 Google 日历 / 华为日历的"导入"功能。</p>
+          <p><strong>4. 到期提醒：</strong>登录后首页会提示 7 天内到期事项；导入手机日历后，手机日历会在每项工作前 1 天自动提醒。</p>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div id="modalRoot"></div>
+<div id="toast" class="toast"></div>
+
+<script src="js/config.js"></script>
+<script src="js/templates.js"></script>
+<script src="js/store.js"></script>
+<script src="js/ics.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
