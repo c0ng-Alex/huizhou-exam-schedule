@@ -119,6 +119,7 @@
   /* ==================== Supabase 适配 ==================== */
   function loadSupabaseLib() {
     if (window.supabase && window.supabase.createClient) return Promise.resolve();
+    // 本地包未加载时，退回到 CDN
     return new Promise(function (resolve, reject) {
       var s = document.createElement('script');
       s.src = 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2';
@@ -131,6 +132,9 @@
   function wrapError(err, fallback) {
     if (!err) return new Error(fallback);
     var msg = err.message || err.error_description || fallback;
+    if (/Load failed|Failed to fetch|NetworkError|network error/i.test(msg)) {
+      msg = '无法连接云端服务器（网络不通或被拦截），请换网络后重试';
+    }
     if (/Invalid login credentials/i.test(msg)) msg = '邮箱或密码不正确';
     if (/User already registered/i.test(msg)) msg = '该邮箱已注册';
     if (/Email not confirmed/i.test(msg)) msg = '邮箱尚未确认，请先在邮箱中点击确认链接';
