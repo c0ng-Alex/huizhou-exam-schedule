@@ -1092,6 +1092,32 @@
       if (e.key === 'Enter') $('btnLogin').click();
     });
 
+    $('btnDiag').addEventListener('click', async function () {
+      var cfg = window.APP_CONFIG || {};
+      if (!cfg.SUPABASE_URL) { showAuthMsg('当前为本地演示模式，无需联网', 'ok'); return; }
+      showAuthMsg('正在检测云端连接…', 'ok');
+      var t0 = Date.now();
+      try {
+        var ctl = new AbortController();
+        var timer = setTimeout(function () { ctl.abort(); }, 8000);
+        var res = await fetch(cfg.SUPABASE_URL + '/auth/v1/settings', {
+          headers: { apikey: cfg.SUPABASE_ANON_KEY },
+          signal: ctl.signal
+        });
+        clearTimeout(timer);
+        var cost = Date.now() - t0;
+        if (res.ok) {
+          showAuthMsg('云端连接正常（' + cost + 'ms）', 'ok');
+        } else {
+          showAuthMsg('云端返回异常状态 ' + res.status + '（' + cost + 'ms），请截图反馈', 'err');
+        }
+      } catch (e) {
+        var cost2 = Date.now() - t0;
+        var why = e.name === 'AbortError' ? '超时 8 秒未响应' : (e.message || e.name);
+        showAuthMsg('连接失败（' + cost2 + 'ms）：' + why + '｜目标 ' + cfg.SUPABASE_URL.replace('https://', ''), 'err');
+      }
+    });
+
     $('btnRegister').addEventListener('click', async function () {
       var name = $('regName').value.trim();
       var dept = $('regDept').value.trim();
