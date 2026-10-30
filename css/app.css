@@ -290,3 +290,7 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
   .modal { max-height: none; box-shadow: none; }
   .modal-body { overflow: visible; }
 }
+
+.auth-diag { text-align: center; margin-top: 14px; font-size: 13px; }
+.auth-diag a { color: #8a94a6; text-decoration: underline; }
+.auth-diag a:hover { color: #4a7cf6; }
