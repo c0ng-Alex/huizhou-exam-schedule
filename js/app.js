@@ -519,7 +519,7 @@
               closeModal();
               toast('已删除', 'success');
               await reloadAll();
-              renderHome();
+              switchView(S.view);
             } catch (e) { toast(e.message || '删除失败', 'error'); }
           };
         }
