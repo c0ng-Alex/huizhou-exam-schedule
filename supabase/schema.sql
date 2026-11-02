@@ -274,6 +274,31 @@ drop policy if exists "logs_select" on public.logs;
 create policy "logs_select" on public.logs
   for select to authenticated using (public.is_admin());
 
+-- ---------- admin_delete_user（管理员删除用户：先停用 profiles，再尝试物理删 auth.users） ----------
+create or replace function public.admin_delete_user(p_user_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not public.is_admin() then
+    raise exception '只有管理员可以删除用户';
+  end if;
+  if p_user_id = auth.uid() then
+    raise exception '不能删除当前登录账号';
+  end if;
+  -- 先停用 profiles，防止后续登录
+  update public.profiles set enabled = false where id = p_user_id;
+  -- 尝试物理删除 auth.users（如果 RLS 或外键阻止则忽略，停用已足够）
+  begin
+    delete from auth.users where id = p_user_id;
+  exception when others then
+    null;
+  end;
+end;
+$$;
+
 -- ============================================================
 -- 完成。首次注册的那个账号即为管理员。
 -- 如需把某个账号设为管理员，可执行：
