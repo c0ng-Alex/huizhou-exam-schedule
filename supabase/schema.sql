@@ -185,13 +185,17 @@ create policy "profiles_insert_self" on public.profiles
   with check (id = auth.uid() or public.is_admin());
 
 -- ---------- schedules ----------
+-- 注意：select 策略必须直接放行 owner_id = auth.uid()。
+-- 否则 INSERT ... RETURNING（PostgREST 的 return=representation）会在同一语句内
+-- 用 can_view_schedule(id) 校验新行，而新行在该快照中尚不可见，报 42501 假 RLS 错误。
 drop policy if exists "schedules_select" on public.schedules;
 create policy "schedules_select" on public.schedules
-  for select to authenticated using (public.can_view_schedule(id));
+  for select to authenticated
+  using (owner_id = auth.uid() or public.can_view_schedule(id));
 
 drop policy if exists "schedules_insert" on public.schedules;
 create policy "schedules_insert" on public.schedules
-  for insert to authenticated with check (owner_id = auth.uid());
+  for insert to authenticated with check (owner_id = auth.uid() or public.is_admin());
 
 drop policy if exists "schedules_update" on public.schedules;
 create policy "schedules_update" on public.schedules
