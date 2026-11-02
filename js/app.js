@@ -912,6 +912,8 @@
 
     $('adminUsers').innerHTML = S.profiles.map(function (p) {
       var isMe = p.id === S.me.id;
+      var firstAdmin = S.profiles.filter(function (x) { return x.role === 'admin'; }).length === 1 && p.role === 'admin';
+      var canDelete = !isMe && !(p.role === 'admin' && firstAdmin);
       return '<div class="user-row"><div style="flex:1;min-width:150px">' +
         '<div class="user-name">' + esc(p.full_name || p.email) +
         (p.role === 'admin' ? ' <span class="tag tag-primary">管理员</span>' : '') +
@@ -920,6 +922,8 @@
         '<div class="task-actions">' +
         (isMe ? '<span class="tag">当前账号</span>' : '<button class="btn btn-sm" data-enable="' + esc(p.id) + '">' + (p.enabled === false ? '启用' : '停用') + '</button>') +
         (isMe ? '' : '<button class="btn btn-sm" data-role="' + esc(p.id) + '">' + (p.role === 'admin' ? '取消管理员' : '设为管理员') + '</button>') +
+        (isMe ? '' : '<button class="btn btn-sm" data-reset="' + esc(p.id) + '" title="向对方发送重置密码邮件">重置密码</button>') +
+        (canDelete ? '<button class="btn btn-sm btn-danger" data-del="' + esc(p.id) + '">删除</button>' : '') +
         '</div></div>';
     }).join('');
 
@@ -948,6 +952,34 @@
           await reloadAll();
           renderAdmin();
         } catch (e) { toast(e.message || '操作失败', 'error'); }
+      };
+    });
+
+    $('adminUsers').querySelectorAll('[data-reset]').forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.getAttribute('data-reset');
+        var p = S.profiles.filter(function (x) { return x.id === id; })[0];
+        if (!confirm('确定要向「' + (p.full_name || p.email) + '」发送重置密码邮件吗？对方收到邮件后可自行设置新密码。')) return;
+        try {
+          var email = await Store.adminResetPassword(id);
+          await Store.addLog('重置密码邮件', p.full_name || p.email, '发送至 ' + email);
+          toast('重置邮件已发送到 ' + email, 'success');
+        } catch (e) { toast(e.message || '发送失败', 'error'); }
+      };
+    });
+
+    $('adminUsers').querySelectorAll('[data-del]').forEach(function (b) {
+      b.onclick = async function () {
+        var id = b.getAttribute('data-del');
+        var p = S.profiles.filter(function (x) { return x.id === id; })[0];
+        if (!confirm('确定要删除用户「' + (p.full_name || p.email) + '」吗？其创建的日程将保留。此操作不可撤销。')) return;
+        try {
+          await Store.adminDeleteUser(id);
+          await Store.addLog('删除用户', p.full_name || p.email, '已停用账号');
+          toast('用户已删除（已停用）', 'success');
+          await reloadAll();
+          renderAdmin();
+        } catch (e) { toast(e.message || '删除失败', 'error'); }
       };
     });
 
@@ -984,6 +1016,26 @@
       $('userChip').textContent = (S.me.full_name || S.me.email) + (S.me.role === 'admin' ? '（管理员）' : '');
       toast('资料已保存', 'success');
     } catch (e) { toast(e.message || '保存失败', 'error'); }
+  }
+
+  async function submitChangePwd() {
+    var p1 = $('pfNewPwd').value;
+    var p2 = $('pfNewPwd2').value;
+    var hint = $('pfPwdHint');
+    hint.textContent = '';
+    if (!p1 || p1.length < 6) { hint.textContent = '密码至少 6 位'; hint.style.color = 'var(--danger)'; return; }
+    if (p1 !== p2) { hint.textContent = '两次输入不一致'; hint.style.color = 'var(--danger)'; return; }
+    try {
+      await Store.changePassword(p1);
+      hint.textContent = '密码已修改，下次登录生效';
+      hint.style.color = 'var(--ok)';
+      $('pfNewPwd').value = '';
+      $('pfNewPwd2').value = '';
+      toast('密码已修改', 'success');
+    } catch (e) {
+      hint.textContent = e.message || '修改失败';
+      hint.style.color = 'var(--danger)';
+    }
   }
 
   /* ================= 导出 / 打印 ================= */
@@ -1173,6 +1225,7 @@
 
     $('btnBackup').addEventListener('click', backupAll);
     $('btnSaveProfile').addEventListener('click', saveProfile);
+    $('btnChangePwd').addEventListener('click', submitChangePwd);
 
     document.addEventListener('click', function (e) {
       if (e.target.closest('#modalRoot')) return;
