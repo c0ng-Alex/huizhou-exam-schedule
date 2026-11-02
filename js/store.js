@@ -374,7 +374,7 @@
         return row;
       }
       try {
-        var rows = await rest('PATCH', 'schedules?id=eq.' + encodeURIComponent(id), Object.assign({ updated_at: nowIso() }, patch), 'select=*');
+        var rows = await rest('PATCH', 'schedules', Object.assign({ updated_at: nowIso() }, patch), 'id=eq.' + encodeURIComponent(id) + '&select=*');
         return Array.isArray(rows) ? rows[0] : rows;
       } catch (e) { throw wrapError(e, '保存日程失败（只有创建者可以修改）'); }
     },
