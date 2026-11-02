@@ -156,13 +156,16 @@
       } catch (e) { token = ''; }
     }
     var url = CFG.SUPABASE_URL + '/rest/v1/' + path + (query ? '?' + query : '');
+    // 只有需要返回结果（带 select=）时才要求 representation，
+    // 否则 RETURNING 会触发 SELECT 策略校验，非管理员写日志等场景会被误判为 RLS 失败
+    var prefer = (query && query.indexOf('select=') >= 0) ? 'return=representation' : 'return=minimal';
     var opts = {
       method: method,
       headers: {
         apikey: CFG.SUPABASE_ANON_KEY,
         Authorization: 'Bearer ' + token,
         'Content-Type': 'application/json',
-        Prefer: 'return=representation'
+        Prefer: prefer
       }
     };
     if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
