@@ -159,6 +159,10 @@
     // 只有需要返回结果（带 select=）时才要求 representation，
     // 否则 RETURNING 会触发 SELECT 策略校验，非管理员写日志等场景会被误判为 RLS 失败
     var prefer = (query && query.indexOf('select=') >= 0) ? 'return=representation' : 'return=minimal';
+    // on_conflict 表示 upsert，必须显式要求冲突时合并，否则第二次勾选会报 409 duplicate key
+    if (method === 'POST' && query && query.indexOf('on_conflict=') >= 0) {
+      prefer += ',resolution=merge-duplicates';
+    }
     var opts = {
       method: method,
       headers: {
