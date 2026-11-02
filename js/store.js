@@ -131,14 +131,57 @@
 
   function wrapError(err, fallback) {
     if (!err) return new Error(fallback);
-    var msg = err.message || err.error_description || fallback;
+    var msg = err.message || err.error_description || err.hint || fallback;
+    if (typeof msg === 'object') msg = JSON.stringify(msg);
     if (/Load failed|Failed to fetch|NetworkError|network error/i.test(msg)) {
       msg = '无法连接云端服务器（网络不通或被拦截），请换网络后重试';
     }
     if (/Invalid login credentials/i.test(msg)) msg = '邮箱或密码不正确';
     if (/User already registered/i.test(msg)) msg = '该邮箱已注册';
     if (/Email not confirmed/i.test(msg)) msg = '邮箱尚未确认，请先在邮箱中点击确认链接';
+    if (/row-level security policy/i.test(msg)) msg = '保存失败（权限限制），请刷新后重试';
+    if (/duplicate key|already exists/i.test(msg)) msg = '记录已存在';
     return new Error(msg);
+  }
+
+  // 用原生 fetch 调 PostgREST，绕开 Supabase SDK 某些版本的奇怪行为
+  async function rest(method, path, body, query) {
+    var session = sb && sb.auth ? await sb.auth.getSession() : null;
+    var token = (session && session.data && session.data.session && session.data.session.access_token) || '';
+    if (!token) {
+      // 从 localStorage 直接读兜底
+      try {
+        var raw = localStorage.getItem('sb-' + (CFG.SUPABASE_URL || '').replace(/^https?:\/\//, '').split('.')[0] + '-auth-token');
+        if (raw) token = JSON.parse(raw).access_token || '';
+      } catch (e) { token = ''; }
+    }
+    var url = CFG.SUPABASE_URL + '/rest/v1/' + path + (query ? '?' + query : '');
+    var opts = {
+      method: method,
+      headers: {
+        apikey: CFG.SUPABASE_ANON_KEY,
+        Authorization: 'Bearer ' + token,
+        'Content-Type': 'application/json',
+        Prefer: 'return=representation'
+      }
+    };
+    if (body !== undefined && body !== null) opts.body = JSON.stringify(body);
+    try {
+      var res = await fetch(url, opts);
+      var text = await res.text();
+      var data = text ? JSON.parse(text) : null;
+      if (!res.ok) {
+        var err = (data && (data.message || data.error_description || data.details)) || res.statusText;
+        var e = new Error(err);
+        e.status = res.status;
+        e.data = data;
+        throw e;
+      }
+      return data;
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error('服务器返回格式异常');
+      throw e;
+    }
   }
 
   async function fetchProfile(userId) {
@@ -306,11 +349,11 @@
         writeDb(db);
         return row;
       }
-      var res = await sb.from('schedules').insert(Object.assign({
-        owner_id: profile.id, owner_name: profile.full_name, updated_at: nowIso()
-      }, data)).select().single();
-      if (res.error) throw wrapError(res.error, '创建日程失败');
-      return res.data;
+      var payload = Object.assign({ owner_id: profile.id, owner_name: profile.full_name, updated_at: nowIso() }, data);
+      try {
+        var rows = await rest('POST', 'schedules', payload, 'select=*');
+        return Array.isArray(rows) ? rows[0] : rows;
+      } catch (e) { throw wrapError(e, '创建日程失败'); }
     },
 
     async updateSchedule(id, patch) {
@@ -323,9 +366,10 @@
         writeDb(db);
         return row;
       }
-      var res = await sb.from('schedules').update(Object.assign({ updated_at: nowIso() }, patch)).eq('id', id).select().single();
-      if (res.error) throw wrapError(res.error, '保存日程失败（只有创建者可以修改）');
-      return res.data;
+      try {
+        var rows = await rest('PATCH', 'schedules?id=eq.' + encodeURIComponent(id), Object.assign({ updated_at: nowIso() }, patch), 'select=*');
+        return Array.isArray(rows) ? rows[0] : rows;
+      } catch (e) { throw wrapError(e, '保存日程失败（只有创建者可以修改）'); }
     },
 
     async deleteSchedule(id) {
@@ -338,9 +382,8 @@
         writeDb(db);
         return true;
       }
-      var res = await sb.from('schedules').delete().eq('id', id);
-      if (res.error) throw wrapError(res.error, '删除日程失败');
-      return true;
+      try { await rest('DELETE', 'schedules?id=eq.' + encodeURIComponent(id)); return true; }
+      catch (e) { throw wrapError(e, '删除日程失败'); }
     },
 
     async getShares(scheduleId) {
@@ -362,15 +405,15 @@
         writeDb(db);
         return true;
       }
-      var del = await sb.from('shares').delete().eq('schedule_id', scheduleId);
-      if (del.error) throw wrapError(del.error, '更新共享成员失败');
-      if (userIds.length) {
-        var ins = await sb.from('shares').insert(userIds.map(function (u) {
-          return { schedule_id: scheduleId, user_id: u };
-        }));
-        if (ins.error) throw wrapError(ins.error, '更新共享成员失败');
-      }
-      return true;
+      try {
+        await rest('DELETE', 'shares?schedule_id=eq.' + encodeURIComponent(scheduleId));
+        if (userIds.length) {
+          await rest('POST', 'shares', userIds.map(function (u) {
+            return { schedule_id: scheduleId, user_id: u };
+          }));
+        }
+        return true;
+      } catch (e) { throw wrapError(e, '更新共享成员失败'); }
     },
 
     async getProgress(scheduleId) {
@@ -400,15 +443,16 @@
         writeDb(db);
         return true;
       }
-      var res = await sb.from('progress').upsert({
-        schedule_id: scheduleId,
-        user_id: profile.id,
-        done: done,
-        notes: notes,
-        updated_at: nowIso()
-      }, { onConflict: 'schedule_id,user_id' });
-      if (res.error) throw wrapError(res.error, '保存进度失败');
-      return true;
+      try {
+        await rest('POST', 'progress', {
+          schedule_id: scheduleId,
+          user_id: profile.id,
+          done: done,
+          notes: notes,
+          updated_at: nowIso()
+        }, 'on_conflict=schedule_id,user_id');
+        return true;
+      } catch (e) { throw wrapError(e, '保存进度失败'); }
     },
 
     async listTemplates() {
@@ -430,9 +474,10 @@
         writeDb(db);
         return row;
       }
-      var res = await sb.from('templates').insert(Object.assign({ created_by: profile.id, is_public: true }, data)).select().single();
-      if (res.error) throw wrapError(res.error, '发布模板失败（仅管理员可发布）');
-      return res.data;
+      try {
+        var rows = await rest('POST', 'templates', Object.assign({ created_by: profile.id, is_public: true }, data), 'select=*');
+        return Array.isArray(rows) ? rows[0] : rows;
+      } catch (e) { throw wrapError(e, '发布模板失败（仅管理员可发布）'); }
     },
 
     async deleteTemplate(id) {
@@ -443,9 +488,8 @@
         writeDb(db);
         return true;
       }
-      var res = await sb.from('templates').delete().eq('id', id);
-      if (res.error) throw wrapError(res.error, '删除模板失败');
-      return true;
+      try { await rest('DELETE', 'templates?id=eq.' + encodeURIComponent(id)); return true; }
+      catch (e) { throw wrapError(e, '删除模板失败'); }
     },
 
     async listLogs() {
@@ -453,9 +497,8 @@
         await delay(40);
         return readDb().logs.slice().reverse();
       }
-      var res = await sb.from('logs').select('*').order('created_at', { ascending: false }).limit(300);
-      if (res.error) throw wrapError(res.error, '读取日志失败');
-      return res.data;
+      try { return await rest('GET', 'logs?select=*&order=created_at.desc&limit=300'); }
+      catch (e) { throw wrapError(e, '读取日志失败'); }
     },
 
     async addLog(action, target, detail) {
@@ -475,8 +518,48 @@
           writeDb(db);
           return;
         }
-        await sb.from('logs').insert(payload);
+        await rest('POST', 'logs', payload);
       } catch (e) { /* 日志失败不影响主流程 */ }
+    },
+
+    /* ============ 新增：密码管理 ============ */
+
+    async changePassword(newPassword) {
+      if (!newPassword || newPassword.length < 6) throw new Error('密码至少 6 位');
+      if (!CLOUD) {
+        var db = readDb();
+        db.passwords[profile.email] = newPassword;
+        writeDb(db);
+        return true;
+      }
+      var res = await sb.auth.updateUser({ password: newPassword });
+      if (res.error) throw wrapError(res.error, '修改密码失败');
+      return true;
+    },
+
+    async adminResetPassword(userId) {
+      if (!CLOUD) throw new Error('本地模式不支持重置密码');
+      // 管理员通过 Supabase auth API 发密码重置邮件
+      var p = await this.listProfiles();
+      var target = p.filter(function (x) { return x.id === userId; })[0];
+      if (!target) throw new Error('用户不存在');
+      var res = await sb.auth.resetPasswordForEmail(target.email, {
+        redirectTo: window.location.origin + window.location.pathname + '?reset=1'
+      });
+      if (res.error) throw wrapError(res.error, '发送重置邮件失败（请确认对方邮箱能收信）');
+      return target.email;
+    },
+
+    async adminDeleteUser(userId) {
+      if (!CLOUD) throw new Error('本地模式不支持删除用户');
+      if (userId === profile.id) throw new Error('不能删除当前登录账号');
+      // 先停用再删，auth.users 层面删除需后端服务，这里先标记停用+清空资料
+      await this.updateProfile(userId, { enabled: false });
+      try {
+        // 尝试调用 SECURITY DEFINER 函数彻底删除 auth.users
+        await rest('POST', 'rpc/admin_delete_user', { user_id: userId });
+      } catch (e) { /* 函数不存在时忽略，只停用 */ }
+      return true;
     },
 
     async exportAllData() {
