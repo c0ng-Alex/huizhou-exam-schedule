@@ -267,20 +267,51 @@ button, input, select, textarea { font-family: inherit; font-size: 14px; }
 /* ---------- 手机适配 ---------- */
 @media (max-width: 780px) {
   .topbar { height: auto; padding: 10px 14px; flex-wrap: wrap; gap: 10px; }
-  .topbar-nav { order: 3; width: 100%; }
-  .nav-btn { padding: 7px 10px; font-size: 13px; }
+  .topbar-nav { order: 3; width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .topbar-nav::-webkit-scrollbar { display: none; }
+  .nav-btn { padding: 7px 10px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
   .brand-name { font-size: 14px; }
   .page { padding: 16px 14px 48px; }
   .card-list { grid-template-columns: 1fr; }
-  .view-head { flex-direction: column; align-items: stretch; }
-  .view-head > button { align-self: flex-start; }
+  .view-head { flex-direction: column; align-items: stretch; gap: 12px; }
+  .view-head > button { align-self: stretch; width: 100%; }
   .grid2 { grid-template-columns: 1fr; }
-  .modal { max-height: 92vh; }
-  .modal-body { padding: 14px; }
-  .task-edit-row { grid-template-columns: 1fr 64px 76px 24px; }
+  .modal { max-height: 94vh; max-width: 96vw; width: 96vw; margin: 2vh auto; }
+  .modal.wide { max-width: 96vw; }
+  .modal-body { padding: 14px; max-height: 72vh; }
+  .modal-foot { padding: 10px 14px; gap: 8px; }
+  .modal-foot .btn { flex: 1; }
+  .task-edit-row { grid-template-columns: 1fr 56px 1fr 28px; gap: 6px; }
+  .task-edit-row input[type="number"] { width: 100%; }
+  .task-edit-row select { width: 100%; }
   .search-input { width: 130px; }
   .user-chip { display: none; }
   .detail-stats { gap: 14px; }
+  .user-row { flex-wrap: wrap; gap: 8px; padding: 12px; }
+  .user-row > div:first-child { min-width: 0; flex-basis: 100%; }
+  .user-row .task-actions { width: 100%; flex-wrap: wrap; gap: 6px; }
+  .user-row .task-actions .btn-sm { flex: 1; min-width: 80px; text-align: center; }
+  .admin-card { padding: 12px; }
+  .log-row { flex-wrap: wrap; gap: 4px; }
+  .log-row .log-time { flex: 0 0 auto; }
+  .remind-bar { padding: 10px 14px; font-size: 13px; }
+  .share-list { max-height: 180px; }
+  .tips p { font-size: 13px; line-height: 1.7; }
+  .field input, .field select { font-size: 16px; } /* 避免 iOS 自动缩放 */
+  .topbar-right { gap: 6px; }
+  .topbar-right .btn-sm { padding: 5px 10px; font-size: 12px; }
+}
+@media (max-width: 420px) {
+  .topbar-nav { gap: 4px; }
+  .nav-btn { padding: 6px 8px; font-size: 12px; }
+  .brand-dot { font-size: 16px; }
+  .brand-name { font-size: 13px; }
+  .page { padding: 14px 12px 40px; }
+  .panel { padding: 12px; }
+  .panel-head { font-size: 14px; }
+  .card { padding: 12px; }
+  .card-title { font-size: 15px; }
+  h2 { font-size: 18px; }
 }
 
 @media print {
